@@ -27,11 +27,27 @@ VERSION="1.00"
 #::::::::::::::          Script Settings                 ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# Ensure administrative privileges.
+[ "$UID" -eq 0 ] || echo -e $YELLOW "This script needs administrative access..." $NO_COLOR
+[ "$UID" -eq 0 ] || exec sudo -E bash "$0" "$@"
+
+# Put a convenient link to the logs where logs are normally found...
+# capture the 3 first letters as org TLA (Three Letter Acronym)
 : "${_my_scriptdir="$( cd "$( dirname ${BASH_SOURCE[0]} )" && pwd )"}"
 : "${_tmp="$( mktemp -d )"}"
 : "${_GIT_PROFILE:-"vonschutter"}"
 
-_potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make"
+# Determine a reasonable location to place logs:
+_LOG_DIR=/var/log/${_TLA:-"rtd"} ; mkdir -p ${_LOG_DIR}
+
+# Location of base administrative scripts and command-lets to get.
+_git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
+
+# Determine log file names for this session
+_LOGFILE=${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M-%S-%s)-$(basename $0)-setup.log
+
+# Likely dependencies that may be needed for installing various themes:
+_potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make git"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -127,6 +143,49 @@ dependency::file ()
 		fi
 	fi 
 
+}
+
+
+dependency::theme_payload ()
+{
+	if echo "$OSTYPE" |grep "linux" ; then
+		echo "Linux OS Found: Attempting to get instructions for Linux..."
+		echo executing $0 >> ${_LOGFILE}
+		if ! hash git &>> ${_LOGFILE} ; then
+			for i in apt yum dnf zypper ; do $i -y install git | tee ${_LOGFILE} ; done
+		fi
+		git clone --depth=1 ${_git_src_url} /opt/${_TLA,,}.tmp | tee ${_LOGFILE}
+			if [ $? -eq 0 ]
+			then
+				echo "Instructions successfully retrieved..."
+				if [[ -d /opt/${_TLA,,}  ]] ; then
+					mv /opt/${_TLA,,} ${_BackupFolderName:="/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup"}
+					zip -m -r -5 ${_BackupFolderName}.zip  ${_BackupFolderName}
+					rm -r ${_BackupFolderName}
+				fi
+				mv /opt/${_TLA,,}.tmp /opt/${_TLA,,} ; rm -rf /opt/${_TLA,,}/.git
+				source /opt/${_TLA,,}/core/_rtd_library
+				oem::register_all_tools
+				ln -s -f ${_LOG_DIR} -T ${_OEM_DIR}/log
+				bash ${_OEM_DIR}/core/rtd-oem-linux-config.sh ${@}
+			else
+				echo "Failed to retrieve instructions correctly! "
+				echo "Suggestion: check write permission in "/opt" or internet connectivity."
+				exit 1
+			fi
+		exit $?
+	elif [[ "$OSTYPE" == "darwin"* ]]; then
+		echo "Mac OSX is currently not supported..."
+	elif [[ "$OSTYPE" == "cygwin" ]]; then
+		echo "CYGWIN is currently unsupported..."
+	elif [[ "$OSTYPE" == "msys" ]]; then
+		echo "Lightweight shell is currently unsupported... "
+	elif [[ "$OSTYPE" == "freebsd"* ]]; then
+		echo "Free BSD is currently unsupported... "
+	else
+	echo "This system is Unknown to this script"
+	fi
+	exit $?
 }
 
 
