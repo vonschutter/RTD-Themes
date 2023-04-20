@@ -40,6 +40,9 @@ VERSION="1.00"
 # Determine a reasonable location to place logs:
 _LOG_DIR=/var/log/${_TLA:-"rtd"} ; mkdir -p ${_LOG_DIR}
 
+# Determine where to place wallpapers
+_WALLPAPER_DIR=${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}
+
 # Location of base administrative scripts and command-lets to get.
 _git_src_url=https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git
 
@@ -55,6 +58,10 @@ _potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make git"
 #::::::::::::::          Script Functions                ::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+
+
+
 
 theme::help ()
 {
@@ -98,12 +105,22 @@ theme::add_global ()
 		for i in *.7z ; do
 			7z x $i -aoa -o${_tmp}
 			pushd "${_tmp}/${i::-3}"  || return 1
-			bash ./install.sh || ( echo "Could not find or run the expected install.sh" ; return 1 )
+			bash ./install.sh || ( echo "An error occured while trying to run the install.sh" ; return 1 )
 			popd
 		done
 		popd
 	;;
-	*)
+	--wallpaper )
+		if  ps -e |grep "gnome-shell"; then 
+			oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}" || return 1
+		elif  ps -e |grep "plasmashell" ; then
+			ln -s "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
+		else 
+			ln -s "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
+			ln -s "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
+		fi
+	;;
+	* )
 		echo "Neither GTK or KDE themes were requested"
 	;;
 	esac
@@ -124,7 +141,6 @@ dependency::file ()
 			if [[ -e "${i}" ]] ; then 
 				echo "${FUNCNAME[0]}: Found ${i}"
 				source "${i}" ""
-				return $? 
 			else 
 				return 1
 			fi
@@ -228,6 +244,10 @@ case $1 in
 		echo "Installing bash theme only"
 		theme::add_global --bash
 	;;
+	--wallpaper | --backgrounds | --images )
+		echo "Installing Wallpapers only"
+		theme::add_global --wallpaper
+	;;
 	--help )
 		theme::help
 	;;
@@ -238,15 +258,18 @@ case $1 in
 			theme::add_global --icon
 			theme::add_global --font
 			theme::add_global --bash
+			theme::add_global --wallpaper
 		elif  ps -e |grep "gnome-shell"; then
 			theme::add_global --gtk
 			theme::add_global --icon
 			theme::add_global --font
 			theme::add_global --bash
+			theme::add_global --wallpaper
 		else
 			echo "Neither plasma or gnome was found! Only installing Icons and fonts."
 			theme::add_global --icon
 			theme::add_global --font
+			theme::add_global --wallpaper
 		fi
 	;;
 esac
