@@ -141,8 +141,7 @@ dependency::file ()
 			if [[ -e "${i}" ]] ; then 
 				echo "${FUNCNAME[0]}: Found ${i}"
 				source "${i}" ""
-			else 
-				return 1
+				return 0
 			fi
 		done	
 	}
