@@ -114,10 +114,10 @@ theme::add_global ()
 		if  ps -e |grep "gnome-shell"; then 
 			oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}" || return 1
 		elif  ps -e |grep "plasmashell" ; then
-			ln -s "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
+			ln -fs "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
 		else 
-			ln -s "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
-			ln -s "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
+			ln -fs "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
+			ln -fs "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
 		fi
 	;;
 	* )
