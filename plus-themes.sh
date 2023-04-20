@@ -111,11 +111,14 @@ theme::add_global ()
 		popd
 	;;
 	--wallpaper )
-		if  ps -e |grep "gnome-shell"; then 
+		chmod 555 -R "${_my_scriptdir}/${1/--/}"
+		if  ps -e |grep "gnome-shell" &>/dev/null ; then 
 			oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}" || return 1
-		elif  ps -e |grep "plasmashell" ; then
+		elif  ps -e |grep "plasmashell" &>/dev/null ; then
+			echo "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 			ln -fs "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
 		else 
+			echo "NOT Sure what DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
 			ln -fs "${_my_scriptdir}/${1/--/}"/* ${_XDG_WALLPAPER_DIR}/ || return 1
 			ln -fs "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
 		fi
