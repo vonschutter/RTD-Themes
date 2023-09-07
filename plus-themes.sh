@@ -40,19 +40,19 @@ VERSION="1.00"
 : "${_GIT_PROFILE:-"vonschutter"}"
 
 # Determine a reasonable location to place logs:
-_LOG_DIR="/var/log/${_TLA:-"rtd"}" ; mkdir -p "${_LOG_DIR}"
+export _LOG_DIR="/var/log/${_TLA:-"rtd"}" ; mkdir -p "${_LOG_DIR}"
 
 # Determine where to place wallpapers
-_WALLPAPER_DIR="${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}"
-S
+export _WALLPAPER_DIR="${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}"
+
 # Location of base administrative scripts and command-lets to get.
-_git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git"
+export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git"
 
 # Determine log file names for this session
-_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename $0)-setup.log"
+_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log" ; export _LOGFILE
 
 # Likely dependencies that may be needed for installing various themes:
-_potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make git"
+export _potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make git"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -117,10 +117,10 @@ theme::add_global ()
 		if  pgrep -f "gnome-shell" &>/dev/null ; then 
 			oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}" || return 1
 		elif  pgrep -f "plasmashell" &>/dev/null ; then
-			echo "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
+			system::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 			ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
 		else 
-			echo "NOT Sure what DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
+			system::log_item "NOT Sure what DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
 			ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
 			ln -fs "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
 		fi
@@ -141,10 +141,15 @@ dependency::file ()
 	{
 		echo "${FUNCNAME[0]}: Searching for ${1} ..."
 
-		for i in "./${1}" "${0%/*}/../core/${1}" "${0%/*}/../../core/${1}" "../core/${1}" "../../core/${1}" "$(find /opt -name ${1} |grep -v bakup )" ; do 
-			echo "${FUNCNAME[0]}: Searching for ${i} ..."
+		for i in "./${1}" \
+		"${0%/*}/../core/${1}" \
+		"${0%/*}/../../core/${1}" \
+		"../core/${1}" \
+		"../../core/${1}" \
+		"$(find /opt -name "${1}" |grep -v bakup )" ; do 
+			tee "${FUNCNAME[0]}: Searching for ${i} ..." >>"${_LOGFILE}"
 			if [[ -e "${i}" ]] ; then 
-				echo "${FUNCNAME[0]}: Found ${i}"
+				tee "${FUNCNAME[0]}: Found ${i}" >>"${_LOGFILE}"
 				source "${i}" ""
 				return 0
 			fi
@@ -194,8 +199,8 @@ dependency::theme_payload ()
 				ln -s -f "${_LOG_DIR}" -T "${_OEM_DIR}"/log
 				bash "${_OEM_DIR}"/core/rtd-oem-linux-config.sh "${*}"
 			else
-				echo "Failed to retrieve instructions correctly! "
-				echo "Suggestion: check write permission in /opt or internet connectivity."
+				system::log_item "Failed to retrieve instructions correctly! "
+				system::log_item "Suggestion: check write permission in /opt or internet connectivity."
 				return 1
 			fi
 		elif [[ "$OSTYPE" == "darwin"* ]]; then
