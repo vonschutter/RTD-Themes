@@ -49,7 +49,7 @@ export _WALLPAPER_DIR="${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}"
 export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git"
 
 # Determine log file names for this session
-_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log" ; export _LOGFILE
+_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log" ; export _LOGFILE ; touch "${_LOGFILE}"
 
 # Likely dependencies that may be needed for installing various themes:
 export _potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make git"
