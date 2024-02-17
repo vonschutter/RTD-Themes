@@ -40,7 +40,7 @@ VERSION="1.00"
 : "${_GIT_PROFILE:-"vonschutter"}"
 
 # Determine a reasonable location to place logs:
-export _LOG_DIR="/var/log/${_TLA:-"rtd"}" ; mkdir -p "${_LOG_DIR}"
+: ${_LOG_DIR:="/var/log/${_TLA:-"rtd"}"} ; mkdir -p "${_LOG_DIR}"
 
 # Determine where to place wallpapers
 export _WALLPAPER_DIR="${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}"
@@ -48,11 +48,11 @@ export _WALLPAPER_DIR="${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}"
 # Location of base administrative scripts and command-lets to get.
 export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Themes.git"
 
-# Determine log file names for this session
-_LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log" ; export _LOGFILE ; touch "${_LOGFILE}"
+# Determine log file names for this session if not set
+: ${_LOGFILE:="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log"} ; export _LOGFILE ; touch "${_LOGFILE}"
 
 # Likely dependencies that may be needed for installing various themes:
-export _potential_dependencies="p7zip-full p7zip p7zip-plugins sassc gettext make git"
+export _potential_dependencies="7z sassc gettext make git"
 
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -135,38 +135,23 @@ theme::add_global ()
 
 dependency::file ()
 {
-	_src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
+	local script_dir
+	script_dir=$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )
 
-	dependency::search_local ()
-	{
-		echo "${FUNCNAME[0]}: Searching for ${1} ..."
-
-		for i in "./${1}" \
-		"${0%/*}/../core/${1}" \
-		"${0%/*}/../../core/${1}" \
-		"../core/${1}" \
-		"../../core/${1}" \
-		"$(find /opt -name "${1}" |grep -v bakup )" ; do 
-			tee "${FUNCNAME[0]}: Searching for ${i} ..." >>"${_LOGFILE}"
-			if [[ -e "${i}" ]] ; then 
-				tee "${FUNCNAME[0]}: Found ${i}" >>"${_LOGFILE}"
-				source "${i}" ""
-				return 0
-			fi
-		done	
-	}
-
-	if dependency::search_local "${1}" ; then
-		return 0
+	if source "${script_dir}/../core/${1}" ; then
+		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../core/${1}"
+	elif source "${script_dir}/../../core/${1}" ; then
+		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../../core/${1}"
+	elif source $(find /opt -name ${1} | grep -v backup) ; then
+		system::log_item "${FUNCNAME[0]}: Using: $(find /opt -name ${1} | grep -v backup)"
+	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" ; then
+		system::log_item "${FUNCNAME[0]}: Using: ${_src_url}"
 	else
-		if wget "${_src_url}" &>/dev/null ; then
-			source ./"${1}"
-			echo "${FUNCNAME[0]} Using: ${_src_url}"
-		else 
-			echo "${FUNCNAME[0]} Failed to find  ${1} "
-			exit 1
-		fi
-	fi 
+		system::log_item "${1} NOT found!"
+		return 1
+	fi
+	return 0
 
 }
 
@@ -216,13 +201,15 @@ dependency::theme_payload ()
 if [[ -z "${RTDFUNCTIONS}" ]] ; then
 	system::log_item "Loading RTD functions..."
 	dependency::file _rtd_library
-	for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
+	dependency::command_exists ${_potential_dependencies}
 else 
 	system::log_item "RTD functions already loaded..."
-	for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
+	dependency::command_exists ${_potential_dependencies}
 fi
 
-[[ -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download |& tee "${_LOGFILE}"
+
+[[ ! -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download |& tee "${_LOGFILE}"
+
 
 case $1 in
 	--gtk | --gnome )
