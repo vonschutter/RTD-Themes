@@ -46,7 +46,7 @@ export _LOG_DIR="/var/log/${_TLA:-"rtd"}" ; mkdir -p "${_LOG_DIR}"
 export _WALLPAPER_DIR="${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}"
 
 # Location of base administrative scripts and command-lets to get.
-export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Setup.git"
+export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Themes.git"
 
 # Determine log file names for this session
 _LOGFILE="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log" ; export _LOGFILE ; touch "${_LOGFILE}"
@@ -176,31 +176,17 @@ dependency::theme_payload ()
 	case "$1" in 
 
 	--download | --desktop )
-		# shellcheck disable=SC2317
 		if echo "$OSTYPE" |grep "linux" ; then
-			system::log_item "Linux OS Found: Attempting to get instructions for Linux..."
-			system::log_item "executing $0"
+			system::log_item "Linux OS Found: Attempting to get themes for Linux..."
 			if ! hash git &>> "${_LOGFILE}" ; then
 				system::log_item "git was not found, attmpting to install it..."
-				for i in apt yum dnf zypper ; do $i -y install git | tee "${_LOGFILE}" ; done
+				for i in apt yum dnf zypper ; do $i -y install git ; done
 			fi
 			
-			if ! git clone --depth=1 "${_git_src_url}" /opt/"${_TLA,,}".tmp | tee "${_LOGFILE}" ;
-			then
-				echo "Instructions successfully retrieved..."
-				if [[ -d /opt/${_TLA,,}  ]] ; then
-					mv /opt/"${_TLA,,}" "${_BackupFolderName:=/opt/${_TLA,,}.$(date +%Y-%m-%d-%H-%M-%S-%s).bakup}"
-					zip -m -r -5 "${_BackupFolderName}".zip  "${_BackupFolderName}"
-					rm -r "${_BackupFolderName}"
-				fi
-				mv /opt/"${_TLA,,}".tmp /opt/"${_TLA,,}" ; rm -rf /opt/"${_TLA,,}"/.git
-				source "/opt/${_TLA,,}/core/_rtd_library"
-				oem::register_all_tools
-				ln -s -f "${_LOG_DIR}" -T "${_OEM_DIR}"/log
-				bash "${_OEM_DIR}"/core/rtd-oem-linux-config.sh "${*}"
+			if git clone --depth=1 "${_git_src_url}" /opt/"${_TLA,,}/themes" ; then
+				echo "Themes successfully retrieved..."
 			else
 				system::log_item "Failed to retrieve instructions correctly! "
-				system::log_item "Suggestion: check write permission in /opt or internet connectivity."
 				return 1
 			fi
 		elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -227,8 +213,16 @@ dependency::theme_payload ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-dependency::file _rtd_library && for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
-[[ -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download
+if [[ -z "${RTDFUNCTIONS}" ]] ; then
+	system::log_item "Loading RTD functions..."
+	dependency::file _rtd_library
+	for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
+else 
+	system::log_item "RTD functions already loaded..."
+	for i in ${_potential_dependencies} ; do check_dependencies  "${i}" ; done
+fi
+
+[[ -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download |& tee "${_LOGFILE}"
 
 case $1 in
 	--gtk | --gnome )
@@ -299,5 +293,6 @@ esac
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 unset _my_scriptdir
 unset _potential_dependencies
-exit
+unset _tmp
+
 
