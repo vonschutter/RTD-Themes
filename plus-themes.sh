@@ -43,7 +43,7 @@ VERSION="1.00"
 : ${_LOG_DIR:="/var/log/${_TLA:-"rtd"}"} ; mkdir -p "${_LOG_DIR}"
 
 # Determine where to place wallpapers
-export _WALLPAPER_DIR="${_WALLPAPER_DIR:-"$(find /opt -name wallpaper)"}"
+export _WALLPAPER_DIR="$(find /opt/${_TLA:-rtd}/modules -name wallpaper)"
 
 # Location of base administrative scripts and command-lets to get.
 export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Themes.git"
@@ -115,7 +115,7 @@ theme::add_global ()
 	--wallpaper )
 		chmod 555 -R "${_my_scriptdir}/${1/--/}"
 		if  pgrep -f "gnome-shell" &>/dev/null ; then 
-			oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}" || return 1
+			oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}/wallpaper" || return 1
 		elif  pgrep -f "plasmashell" &>/dev/null ; then
 			system::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 			ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
@@ -126,7 +126,7 @@ theme::add_global ()
 		fi
 	;;
 	* )
-		echo "Neither GTK or KDE themes were requested"
+		write_warning "Neither GTK or KDE themes were requested"
 	;;
 	esac
 }
@@ -148,7 +148,7 @@ dependency::file ()
 	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" ; then
 		system::log_item "${FUNCNAME[0]}: Using: ${_src_url}"
 	else
-		system::log_item "${1} NOT found!"
+		echo "${1} NOT found!"
 		return 1
 	fi
 	return 0
@@ -199,7 +199,7 @@ dependency::theme_payload ()
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 if [[ -z "${RTDFUNCTIONS}" ]] ; then
-	system::log_item "Loading RTD functions..."
+	echo "Loading RTD functions..."
 	dependency::file _rtd_library
 	dependency::command_exists ${_potential_dependencies}
 else 
