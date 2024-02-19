@@ -155,7 +155,7 @@ theme::add_global ()
 			if  pgrep -f "gnome-shell" &>/dev/null ; then
 				theme::log_item "Registering wallpapers in: ${_WALLPAPER_DIR} "
 				theme::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
-				theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg"
+				theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
 			elif  pgrep -f "plasmashell" &>/dev/null ; then
 				theme::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
