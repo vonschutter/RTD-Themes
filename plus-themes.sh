@@ -72,7 +72,7 @@ theme::help ()
 	🔧           Linux Desktop Theme Install Script           🔧
 	------------------------------------------------------------
 	This script is used to install themes on a Linux system. It assumes that themes
-	are placed in sub folders named gtk, kde, ico, and fon, directly in same folder as
+	are placed in sub folders named wallpaper, gtk, kde, ico, and fon, directly in same folder as
 	this script itself. In each of these folders individual themes for icons, gnome,
 	plasma, and fonts are compressed in the 7z format. This format often results in
 	half the files sizes compared to the zip format. Further, in each of these compressed
@@ -80,16 +80,17 @@ theme::help ()
 	copying the contents to the appropriate location.
 
 	Syntax:
-	${0} [ --gtk | --kde | --font | --icon | --bash | --all | --help ]
+	${0} [ --wallpaper | --gtk | --kde | --font | --icon | --bash | --all | --help ]
 
 	Where:
-	--gtk	Install all Gnome themes
-	--kde 	Install all KDE Plasma themes
-	--fonts	Install all additional fonts
-	--icons Install all additional icon themes
-	--bash  Install bash terminal theme with starship
-	--all	Install everything
-	--help	Display this help message
+	--wallpaper    Install wallpapers
+	--gtk          Install all Gnome themes
+	--kde          Install all KDE Plasma themes
+	--fonts        Install all additional fonts
+	--icons        Install all additional icon themes
+	--bash         Install bash terminal theme with starship
+	--all          Install everything
+	--help         Display this help message
 
 	If nothing is specified the script will try to detect the desktop session and
 	install the appropriate themes.
