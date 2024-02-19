@@ -71,9 +71,9 @@ theme::help ()
 	------------------------------------------------------------
 	🔧           Linux Desktop Theme Install Script           🔧
 	------------------------------------------------------------
-	This script is used to install themes on a linux system. It assumes that themes
+	This script is used to install themes on a Linux system. It assumes that themes
 	are placed in sub folders named gtk, kde, ico, and fon, directly in same folder as
-	this script itself. In each of these folders idividual themes for icons, gnome,
+	this script itself. In each of these folders individual themes for icons, gnome,
 	plasma, and fonts are compressed in the 7z format. This format often results in
 	half the files sizes compared to the zip format. Further, in each of these compressed
 	archives a script called install.sh is expected. The install.sh file should do the job of
@@ -161,7 +161,7 @@ dependency::theme_payload ()
 		if echo "$OSTYPE" |grep "linux" ; then
 			theme::log_item "Linux OS Found: Attempting to get themes for Linux..."
 			if ! hash git &>> "${_LOGFILE}" ; then
-				theme::log_item "git was not found, attmpting to install it..."
+				theme::log_item "git was not found, attempting to install it..."
 				for i in apt yum dnf zypper ; do $i -y install git ; done
 			fi
 			
@@ -288,7 +288,7 @@ write_host ()
 	[[ -z "${_text}" ]] && local _text="${color} 💻 $2 $(tput sgr0)"
 	echo -e "${_text} "
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 	theme::log_item "🧩 💻 ${FUNCNAME[1]}: ${_text}"
 
 }
@@ -309,7 +309,7 @@ write_error ()
 		fi
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 	[ -n "${text}" ] && theme::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
 
 }
@@ -325,7 +325,7 @@ write_warning ()
 		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 	[ -n "${text}" ] && theme::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
 	
 }
@@ -341,7 +341,7 @@ write_status ()
 		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 	[ -n "${text}" ] && theme::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
 	
 }
@@ -357,7 +357,7 @@ write_information ()
 		[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
 	fi
 
-	# Tell the loging function to log the message requested...
+	# Tell the logging function to log the message requested...
 	theme::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
 	
 }
