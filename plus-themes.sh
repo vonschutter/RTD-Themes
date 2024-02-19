@@ -30,25 +30,27 @@ VERSION="1.00"
 
 
 # Ensure administrative privileges.
-[ "$UID" -eq 0 ] || echo -e "This script needs administrative access..." 
-[ "$UID" -eq 0 ] || exec sudo -E bash "$0" "$@"
+[ "$UID" -eq 0 ] || { echo -e "This script needs administrative access..." ; exec sudo -E bash "$0" "$@" ; }
 
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
 : "${_my_scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"}"
-: "${_GIT_PROFILE:-"vonschutter"}"
+: "${_GIT_PROFILE:="vonschutter"}"
+: "${_scriptname="$( basename "${BASH_SOURCE[0]}" )"}"
+: "${_TLA:=${_scriptname:0:3}}"
+: "${_tla:="${_TLA,,}"}"
 
 # Determine a reasonable location to place logs:
-: ${_LOG_DIR:="/var/log/${_TLA:-"rtd"}"} ; mkdir -p "${_LOG_DIR}"
+: "${_LOG_DIR:="/var/log/${_TLA:-"rtd"}"}" ; mkdir -p "${_LOG_DIR}"
 
-# Determine where to place wallpapers
-export _WALLPAPER_DIR="$(find /opt/${_TLA:-rtd}/modules -name wallpaper)"
+# Location of theme wallpapers
+_WALLPAPER_DIR="/opt/${_tla:-rtd}/themes/wallpaper"
 
 # Location of base administrative scripts and command-lets to get.
 export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Themes.git"
 
 # Determine log file names for this session if not set
-: ${_LOGFILE:="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log"} ; export _LOGFILE ; touch "${_LOGFILE}"
+: "${_LOGFILE:="${_LOG_DIR}/$(date +%Y-%m-%d-%H-%M)-$(basename "$0")-setup.log"}" ; export _LOGFILE ; touch "${_LOGFILE}"
 
 # Likely dependencies that may be needed for installing various themes:
 export _potential_dependencies="7z sassc gettext make git"
@@ -143,7 +145,7 @@ theme::add_global ()
 		--wallpaper )
 			chmod 555 -R "${_my_scriptdir}/${1/--/}"
 			if  pgrep -f "gnome-shell" &>/dev/null ; then
-				oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}/wallpaper" || return 1
+				oem::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
 			elif  pgrep -f "plasmashell" &>/dev/null ; then
 				theme::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
