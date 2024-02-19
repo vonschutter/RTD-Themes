@@ -229,10 +229,6 @@ theme::register_wallpapers_for_gnome ()
 
 	# Ensure the destination directory exists
 	mkdir -p "$dest_dir"
-
-	# Use 'mv' instead of 'sed' to place the file to avoid unnecessary complexity
-	# and potential issues with file paths. If further processing is needed,
-	# it should be handled more explicitly.
 	mv "$xml_file" "$dest_file"
 
 	echo "Wallpapers registered successfully at $dest_file"
