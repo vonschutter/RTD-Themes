@@ -37,7 +37,7 @@ VERSION="1.00"
 : "${_my_scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"}"
 : "${_GIT_PROFILE:="vonschutter"}"
 : "${_scriptname="$( basename "${BASH_SOURCE[0]}" )"}"
-: "${_TLA:=${_scriptname:0:3}}"
+: "${_TLA:=RTD}"
 : "${_tla:="${_TLA,,}"}"
 
 # Determine a reasonable location to place logs:
@@ -101,6 +101,12 @@ theme::help ()
 }
 
 
+
+theme::run_command_in_gnome_user_session () {
+	sudo -H -u "$SUDO_USER" DISPLAY=$DISPLAY DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus $*
+}
+
+
 theme::add_global ()
 {
 	case "${1}" in
@@ -149,6 +155,7 @@ theme::add_global ()
 			if  pgrep -f "gnome-shell" &>/dev/null ; then
 				theme::log_item "Registering wallpapers in: ${_WALLPAPER_DIR} "
 				theme::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
+				theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/Wayland.jpg"
 			elif  pgrep -f "plasmashell" &>/dev/null ; then
 				theme::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
