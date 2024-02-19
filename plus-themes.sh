@@ -36,7 +36,6 @@ VERSION="1.00"
 # Put a convenient link to the logs where logs are normally found...
 # capture the 3 first letters as org TLA (Three Letter Acronym)
 : "${_my_scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"}"
-: "${_tmp="$( mktemp -d )"}"
 : "${_GIT_PROFILE:-"vonschutter"}"
 
 # Determine a reasonable location to place logs:
@@ -102,57 +101,46 @@ theme::help ()
 theme::add_global ()
 {
 	case "${1}" in
-	--bash | --font | --gtk | --icon | --kde )
-		pushd "${_my_scriptdir}/${1/--/}" || return 1
-		for i in *.7z ; do
-			7z x "$i" -aoa -o"${_tmp}"
-			pushd "${_tmp}/${i::-3}"  || return 1
-			bash ./install.sh || ( echo "An error occurred while trying to run the install.sh" ; return 1 )
-			popd || return 1
-		done
-		popd || return 1
-	;;
-	--wallpaper )
-		chmod 555 -R "${_my_scriptdir}/${1/--/}"
-		if  pgrep -f "gnome-shell" &>/dev/null ; then 
-			oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}/wallpaper" || return 1
-		elif  pgrep -f "plasmashell" &>/dev/null ; then
-			system::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
-			ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
-		else 
-			system::log_item "NOT Sure what DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
-			ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
-			ln -fs "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
-		fi
-	;;
-	* )
-		write_warning "Neither GTK or KDE themes were requested"
-	;;
+		--bash | --font | --gtk | --icon | --kde )
+			pushd "${_my_scriptdir}/${1/--/}" || { write_error "${1/--/} not found where expected"; return 1; }
+			_tmp="$( mktemp -d )"
+
+			for i in *.7z *.7z.001; do
+				# Extract only if it's a single .7z file or the first part of a multi-part archive
+				7z x "$i" -aoa -o"${_tmp}"
+
+				# Assuming the directory name is the archive name without the extension
+				dir_name="${i%%.7z*}"
+				pushd "${_tmp}/${dir_name}" || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; return 1; }
+
+				if [[ -f ./run.sh ]]; then
+					bash ./run.sh || { write_error "An error occurred while trying to run the run.sh"; return 1; }
+				elif [[ -f ./install.sh ]]; then
+					bash ./install.sh || { write_error "An error occurred while trying to run the install.sh"; return 1; }
+				fi
+
+				popd || { write_error "Failure to pop from directory ${dir_name}"; return 1; }
+			done
+
+			popd || { write_error "Failure to pop from directory ${1/--/}"; return 1; }
+		;;
+		--wallpaper )
+			chmod 555 -R "${_my_scriptdir}/${1/--/}"
+			if  pgrep -f "gnome-shell" &>/dev/null ; then
+				oem::register_wallpapers_for_gnome "${_my_scriptdir}/${1/--/}/wallpaper" || return 1
+			elif  pgrep -f "plasmashell" &>/dev/null ; then
+				theme::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
+				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
+			else
+				theme::log_item "NOT Sure what DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
+				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
+				ln -fs "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
+			fi
+		;;
+		* )
+			write_warning "Neither GTK or KDE themes were requested"
+		;;
 	esac
-}
-
-
-
-dependency::file ()
-{
-	local _src_url="https://github.com/${_GIT_PROFILE:-vonschutter}/RTD-Setup/raw/main/core/${1}"
-	local script_dir
-	script_dir=$( cd "$( dirname "$(readlink -f ${BASH_SOURCE[0]})" )" && pwd )
-
-	if source "${script_dir}/../core/${1}" ; then
-		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../core/${1}"
-	elif source "${script_dir}/../../core/${1}" ; then
-		system::log_item "${FUNCNAME[0]}: Using: ${script_dir}/../../core/${1}"
-	elif source $(find /opt -name ${1} | grep -v backup) ; then
-		system::log_item "${FUNCNAME[0]}: Using: $(find /opt -name ${1} | grep -v backup)"
-	elif curl -sL "${_src_url}" -o "./${1}" && source "./${1}" ; then
-		system::log_item "${FUNCNAME[0]}: Using: ${_src_url}"
-	else
-		echo "${1} NOT found!"
-		return 1
-	fi
-	return 0
-
 }
 
 
@@ -162,16 +150,16 @@ dependency::theme_payload ()
 
 	--download | --desktop )
 		if echo "$OSTYPE" |grep "linux" ; then
-			system::log_item "Linux OS Found: Attempting to get themes for Linux..."
+			theme::log_item "Linux OS Found: Attempting to get themes for Linux..."
 			if ! hash git &>> "${_LOGFILE}" ; then
-				system::log_item "git was not found, attmpting to install it..."
+				theme::log_item "git was not found, attmpting to install it..."
 				for i in apt yum dnf zypper ; do $i -y install git ; done
 			fi
 			
 			if git clone --depth=1 "${_git_src_url}" /opt/"${_TLA,,}/themes" ; then
 				echo "Themes successfully retrieved..."
 			else
-				system::log_item "Failed to retrieve instructions correctly! "
+				theme::log_item "Failed to retrieve instructions correctly! "
 				return 1
 			fi
 		elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -191,6 +179,245 @@ dependency::theme_payload ()
 }
 
 
+theme::register_wallpapers_for_gnome ()
+{
+	# Validate the input directory
+	local _wallpaper_dir="${1:-"${_WALLPAPER_DIR}"}"
+	if [[ ! -d "$_wallpaper_dir" ]]; then
+		echo "Error: Directory '$_wallpaper_dir' does not exist."
+		return 1
+	fi
+
+	local xml_file="oem-backgrounds.xml"
+	local dest_dir="/usr/local/share/gnome-background-properties"
+	local dest_file="${dest_dir}/${xml_file}"
+
+	# Start with the XML header
+	cat > "$xml_file" <<-EOF
+	<?xml version="1.0" encoding="UTF-8"?>
+	<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
+	<wallpapers>
+	EOF
+
+	# Safely iterate over .jpg and .png files
+	shopt -s nullglob
+	for i in "$_wallpaper_dir"/*.jpg "$_wallpaper_dir"/*.png; do
+		cat >> "$xml_file" <<-EOF
+	<wallpaper>
+	    <name>$(basename "$i")</name>
+	    <filename>$i</filename>
+	    <options>stretched</options>
+	    <pcolor>#8f4a1c</pcolor>
+	    <scolor>#8f4a1c</scolor>
+	    <shade_type>solid</shade_type>
+	</wallpaper>
+	EOF
+	done
+	shopt -u nullglob
+
+	# Finish with the XML footer
+	echo "</wallpapers>" >> "$xml_file"
+
+	# Ensure the destination directory exists
+	mkdir -p "$dest_dir"
+
+	# Use 'mv' instead of 'sed' to place the file to avoid unnecessary complexity
+	# and potential issues with file paths. If further processing is needed,
+	# it should be handled more explicitly.
+	mv "$xml_file" "$dest_file"
+
+	echo "Wallpapers registered successfully at $dest_file"
+}
+
+
+
+set_colors ()
+{
+  	local ecode="\033["
+
+	yellow="${ecode}1;33m"
+	darkyellow="${ecode}0;33m"
+	red="${ecode}1;31m"
+	darkred="${ecode}0;31m"
+	endcolor="${ecode}0m"
+	green="${ecode}1;32m"
+	darkgreen="${ecode}1;32m"
+	blue="${ecode}1;34m"
+	darkblue="${ecode}0;34m"
+	cyan="${ecode}0;36"
+	darkcyan="${ecode}0;36"
+	gray="${ecode}0;37"
+	purple="${ecode}1;35"
+	darkpurple="${ecode}0;35"
+}
+
+
+
+
+
+write_host ()
+{
+	_option=$1
+
+	case ${_option} in
+		--yellow ) color="$(tput bold; tput setaf 3)" ;;
+		--darkyellow ) color="$(tput dim; tput setaf 3)" ;;
+		--red ) color="$(tput bold; tput setaf 1)" ;;
+		--darkred ) color="$(tput setaf 3)" ;;
+		--endcolor ) color="$(tput sgr0)" ;;
+		--green ) color="$(tput bold; tput setaf 2)" ;;
+		--darkgreen ) color="$(tput dim; tput setaf 2)" ;;
+		--blue ) color="$(tput bold; tput setaf 4)" ;;
+		--darkblue ) color="$(tput dim; tput setaf 4)" ;;
+		--cyan ) color="$(tput bold; tput setaf 6)" ;;
+		--darkcyan ) color="$(tput dim; tput setaf 6)" ;;
+		--gray ) color="$(tput dim; tput setaf 7)" ;;
+		--purple ) color="$(tput bold; tput setaf 5)" ;;
+		--darkpurple ) color="$(tput dim; tput setaf 5)" ;;
+		*) local _text="$1" ;;
+	esac
+	[[ -z "${_text}" ]] && local _text="${color} 💻 $2 $(tput sgr0)"
+	echo -e "${_text} "
+
+	# Tell the loging function to log the message requested...
+	theme::log_item "🧩 💻 ${FUNCNAME[1]}: ${_text}"
+
+}
+
+
+
+write_error ()
+{
+	local text=$1
+
+	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+		if [[ -n "${text}" ]]; then
+			echo "🧩 💥 ${FUNCNAME[1]}: ${text}"
+		fi
+	else
+		if [[ -n "${text}" ]]; then
+			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}${endcolor}"
+		fi
+	fi
+
+	# Tell the loging function to log the message requested...
+	[ -n "${text}" ] && theme::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
+
+}
+
+
+write_warning ()
+{
+	local text=$1
+
+	if [[ "${TERMUITXT}" == "nocolor" ]]; then
+		[ -n "${text}" ] && echo "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
+	else
+		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
+	fi
+
+	# Tell the loging function to log the message requested...
+	[ -n "${text}" ] && theme::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
+	
+}
+
+
+write_status ()
+{
+	local text=$1
+
+	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
+		[ -n "${text}" ] && echo "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+	else
+		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
+	fi
+
+	# Tell the loging function to log the message requested...
+	[ -n "${text}" ] && theme::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+	
+}
+
+
+write_information ()
+{
+	local text=$1
+
+	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
+		[ -n "${text}" ] && echo -e "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+	else
+		[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
+	fi
+
+	# Tell the loging function to log the message requested...
+	theme::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+	
+}
+
+
+
+
+theme::log_item () {
+	if [[ -z $_LOGFILE ]]; then
+		# If log file not set globally, set it to defaults for this function a.k.a. script name
+		local scriptname=$(basename "${BASH_SOURCE[0]}")
+		local tla=${scriptname:0:3}
+
+		if [[ $EUID -ne 0 ]]; then
+			local log_dir="${HOME}/.config/rtd/logs"
+		else
+			local log_dir=${_LOG_DIR:-"/var/log/${tla,,}"}
+		fi
+
+		if ! mkdir -p "$log_dir"; then
+			printf "Error: could not create log directory %s\n" "$log_dir" >&2
+			return 1
+		fi
+
+		local logfile="${log_dir}/${scriptname}.log"
+	else 
+		local logfile="${_LOGFILE}"
+	fi
+
+	touch "$logfile"
+	local date="$(date '+%Y/%m/%d %H:%M')"
+
+	# Format the log item based on the calling function for clear reading
+	local log_prefix="${date}  ---"
+	local log_type=""
+	local log_message=""
+
+	case "${FUNCNAME[1]}" in
+		write_error)
+			log_type="ERR!"
+			log_message="$*"
+		;;
+		write_warning)
+			log_type="WARN"
+			log_message="$*"
+		;;
+		write_information)
+			log_type="INFO"
+			log_message="$*"
+		;;
+		write_host)
+			log_type="HOST"
+			log_message="$*"
+		;;
+		write_status)
+			log_type="STAT"
+			log_message="$*"
+		;;
+		*)
+			log_type="LOGD"
+			log_message="${FUNCNAME[1]}: $*"
+		;;
+	esac
+
+	echo "${log_prefix} ${log_type} : ${log_message}" >> "$logfile"
+}
+
+
+
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
@@ -198,30 +425,21 @@ dependency::theme_payload ()
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-if [[ -z "${RTDFUNCTIONS}" ]] ; then
-	echo "Loading RTD functions..."
-	dependency::file _rtd_library
-	dependency::command_exists ${_potential_dependencies}
-else 
-	system::log_item "RTD functions already loaded..."
-	dependency::command_exists ${_potential_dependencies}
-fi
-
-
+set_colors
 [[ ! -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download |& tee "${_LOGFILE}"
 
 
 case $1 in
 	--gtk | --gnome )
-		system::log_item "Foced install of GTK themes..."
+		theme::log_item "Foced install of GTK themes..."
 		theme::add_global --gtk
 	;;
 	--kde | --plasma )
-		system::log_item "Foced install of KDE themes..."
+		theme::log_item "Foced install of KDE themes..."
 		theme::add_global --kde
 	;;
 	--all )
-		echo "Foced install of ALL themes..."
+		write_information "Foced install of ALL themes..."
 		theme::add_global --kde
 		theme::add_global --gtk
 		theme::add_global --icon
@@ -229,42 +447,42 @@ case $1 in
 		theme::add_global --bash
 	;;
 	--icons | --icon)
-		system::log_item "Installing icons only..."
+		theme::log_item "Installing icons only..."
 		theme::add_global --icon
 	;;
 	--fonts | --font )
-		system::log_item "Installing fonts only"
+		theme::log_item "Installing fonts only"
 		theme::add_global --font
 	;;
 	--bash | --term | --terminal )
-		system::log_item "Installing bash theme only"
+		theme::log_item "Installing bash theme only"
 		theme::add_global --bash
 	;;
 	--wallpaper | --backgrounds | --images )
-		system::log_item "Installing Wallpapers only"
+		theme::log_item "Installing Wallpapers only"
 		theme::add_global --wallpaper
 	;;
 	--help )
 		theme::help
 	;;
 	* )
-		system::log_item "No preference stated. Autodetecting themes for current environment..."
+		theme::log_item "No preference stated. Autodetecting themes for current environment..."
 		if  pgrep -f "plasmashell" ; then
-			system::log_item "Found plasmashell; installing kde themes, icons, fonts, bash theme, and wallpapers..."
+			theme::log_item "Found plasmashell; installing kde themes, icons, fonts, bash theme, and wallpapers..."
 			theme::add_global --kde
 			theme::add_global --icon
 			theme::add_global --font
 			theme::add_global --bash
 			theme::add_global --wallpaper
 		elif  pgrep -f "gnome-shell"; then
-			system::log_item "Found gnome-shell; installing gnome themes, icons, fonts, bash theme, and wallpapers..."
+			theme::log_item "Found gnome-shell; installing gnome themes, icons, fonts, bash theme, and wallpapers..."
 			theme::add_global --gtk
 			theme::add_global --icon
 			theme::add_global --font
 			theme::add_global --bash
 			theme::add_global --wallpaper
 		else
-			system::log_item "Neither plasma or gnome was found! Only installing Icons, wallpapers and fonts."
+			theme::log_item "Neither plasma or gnome was found! Only installing Icons, wallpapers and fonts."
 			theme::add_global --icon
 			theme::add_global --font
 			theme::add_global --wallpaper
