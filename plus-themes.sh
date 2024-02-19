@@ -147,6 +147,7 @@ theme::add_global ()
 		--wallpaper )
 			chmod 555 -R "${_my_scriptdir}/${1/--/}"
 			if  pgrep -f "gnome-shell" &>/dev/null ; then
+				theme::log_item "Registering wallpapers in: ${_WALLPAPER_DIR} "
 				theme::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
 			elif  pgrep -f "plasmashell" &>/dev/null ; then
 				theme::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
@@ -202,14 +203,14 @@ dependency::theme_payload ()
 theme::register_wallpapers_for_gnome ()
 {
 	# Validate the input directory
-	local _wallpaper_dir="${1:-"${_WALLPAPER_DIR}"}"
+	local _wallpaper_dir="${1}"
 	if [[ ! -d "$_wallpaper_dir" ]]; then
-		echo "Error: Directory '$_wallpaper_dir' does not exist."
+		write_error "Error: Directory '$_wallpaper_dir' does not exist."
 		return 1
 	fi
 
 	local xml_file="oem-backgrounds.xml"
-	local dest_dir="/usr/local/share/gnome-background-properties"
+	local dest_dir="/usr/share/gnome-background-properties"
 	local dest_file="${dest_dir}/${xml_file}"
 
 	# Start with the XML header
