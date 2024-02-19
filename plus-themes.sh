@@ -112,7 +112,7 @@ theme::add_global ()
 
 			for arch in "${_archives[@]}"; do
 				# Extract only if it's a single .7z file or the first part of a multi-part archive
-				write_status "Processing file: $arch"
+				write_status "Processing package archive: $arch"
 				7z x "$arch" -aoa -o"${_tmp}"
 
 				# Remove leading './' if present due to `find` command usage
@@ -132,8 +132,10 @@ theme::add_global ()
 				pushd "${_tmp}/${dir_name}" || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; return 1; }
 
 				if [[ -f ./run.sh ]]; then
+					write_status "Installing package contents: ${dir_name}"
 					bash ./run.sh || { write_error "An error occurred while trying to run the run.sh"; return 1; }
 				elif [[ -f ./install.sh ]]; then
+					write_status "Installing package contents: ${dir_name}"
 					bash ./install.sh || { write_error "An error occurred while trying to run the install.sh"; return 1; }
 				fi
 
@@ -145,7 +147,7 @@ theme::add_global ()
 		--wallpaper )
 			chmod 555 -R "${_my_scriptdir}/${1/--/}"
 			if  pgrep -f "gnome-shell" &>/dev/null ; then
-				oem::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
+				theme::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
 			elif  pgrep -f "plasmashell" &>/dev/null ; then
 				theme::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
