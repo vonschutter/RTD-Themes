@@ -103,14 +103,23 @@ theme::add_global ()
 	case "${1}" in
 		--bash | --font | --gtk | --icon | --kde )
 			pushd "${_my_scriptdir}/${1/--/}" || { write_error "${1/--/} not found where expected"; return 1; }
+			local _tmp _archives
 			_tmp="$( mktemp -d )"
+			_archives="$(ls *.7z *.7z.001 )"
 
-			for i in *.7z *.7z.001; do
+			for i in ${_archives} ; do
 				# Extract only if it's a single .7z file or the first part of a multi-part archive
 				7z x "$i" -aoa -o"${_tmp}"
 
 				# Assuming the directory name is the archive name without the extension
-				dir_name="${i%%.7z*}"
+				if echo ${i} |grep -i 7z ; then
+					dir_name="${i%%.7z}"
+				elif echo ${i} |grep -i 7z.001 ; then
+					dir_name=${i%%.7z.001}
+				else
+					write_error "Suffix mismatch in ${i}"
+				fi
+
 				pushd "${_tmp}/${dir_name}" || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; return 1; }
 
 				if [[ -f ./run.sh ]]; then
