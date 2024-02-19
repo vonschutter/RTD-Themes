@@ -105,21 +105,27 @@ theme::add_global ()
 			pushd "${_my_scriptdir}/${1/--/}" || { write_error "${1/--/} not found where expected"; return 1; }
 			local _tmp _archives
 			_tmp="$( mktemp -d )"
-			_archives="$(ls *.7z *.7z.001 )"
+			readarray -t _archives < <(find . -name '*.7z' -o -name '*.7z.001')
 
-			for i in ${_archives} ; do
+			for arch in "${_archives[@]}"; do
 				# Extract only if it's a single .7z file or the first part of a multi-part archive
-				7z x "$i" -aoa -o"${_tmp}"
+				write_status "Processing file: $arch"
+				7z x "$arch" -aoa -o"${_tmp}"
 
-				# Assuming the directory name is the archive name without the extension
-				if echo ${i} |grep -i 7z ; then
-					dir_name="${i%%.7z}"
-				elif echo ${i} |grep -i 7z.001 ; then
-					dir_name=${i%%.7z.001}
+				# Remove leading './' if present due to `find` command usage
+				arch=${arch#./}
+
+				# set extracted folder name...
+				if [[ "$arch" =~ \.7z\.001$ ]]; then
+					dir_name="${arch%.7z.001}"
+				elif [[ "$arch" =~ \.7z$ ]]; then
+					dir_name="${arch%.7z}"
 				else
-					write_error "Suffix mismatch in ${i}"
+					write_error "No matching extension for $arch"
+					continue
 				fi
 
+				# Enter and run the included installer
 				pushd "${_tmp}/${dir_name}" || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; return 1; }
 
 				if [[ -f ./run.sh ]]; then
@@ -364,8 +370,14 @@ write_information ()
 theme::log_item () {
 	if [[ -z $_LOGFILE ]]; then
 		# If log file not set globally, set it to defaults for this function a.k.a. script name
-		local scriptname=$(basename "${BASH_SOURCE[0]}")
-		local tla=${scriptname:0:3}
+		local date
+		local logfile
+		local scriptname
+
+		scriptname=$(basename "${BASH_SOURCE[0]}")
+		tla=${scriptname:0:3}
+		touch "$logfile"
+		date="$(date '+%Y/%m/%d %H:%M')"
 
 		if [[ $EUID -ne 0 ]]; then
 			local log_dir="${HOME}/.config/rtd/logs"
@@ -383,8 +395,6 @@ theme::log_item () {
 		local logfile="${_LOGFILE}"
 	fi
 
-	touch "$logfile"
-	local date="$(date '+%Y/%m/%d %H:%M')"
 
 	# Format the log item based on the calling function for clear reading
 	local log_prefix="${date}  ---"
