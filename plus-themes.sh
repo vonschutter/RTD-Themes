@@ -103,7 +103,7 @@ theme::help ()
 
 
 theme::run_command_in_gnome_user_session () {
-	sudo -H -u "$SUDO_USER" DISPLAY=$DISPLAY DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u "$SUDO_USER")/bus $*
+	sudo -H -u "$SUDO_USER" DISPLAY="$DISPLAY" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "$SUDO_USER")/bus" bash -c "$*"
 }
 
 
