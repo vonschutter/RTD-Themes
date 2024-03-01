@@ -1,5 +1,5 @@
 #!/bin/bash
-PUBLICATION="${_TLA} Simple Global Theme Install"
+PUBLICATION=$(basename "$0" .sh | cut -c 1-3 | tr '[:lower:]' '[:upper:]'); PUBLICATION="${PUBLICATION} Simple Global Theme Install"
 VERSION="1.00"
 #
 #::             Linux Theme Installer Script
@@ -32,16 +32,15 @@ VERSION="1.00"
 # Ensure administrative privileges.
 [ "$UID" -eq 0 ] || { echo -e "This script needs administrative access..." ; exec sudo -E bash "$0" "$@" ; }
 
-# Put a convenient link to the logs where logs are normally found...
-# capture the 3 first letters as org TLA (Three Letter Acronym)
+# Set key variables with defaults for when they are not defined in the environment
 : "${_my_scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"}"
 : "${_GIT_PROFILE:="vonschutter"}"
 : "${_scriptname="$( basename "${BASH_SOURCE[0]}" )"}"
-: "${_TLA:=RTD}"
-: "${_tla:="${_TLA,,}"}"
+: "${_TLA:="$(basename "$0" .sh | cut -c 1-3 | tr '[:lower:]' '[:upper:]'); _TLA=${_TLA})"}"
+: "${_tla:="$(basename "$0" .sh | cut -c 1-3 | tr '[:upper:]' '[:lower:]')"}"
 
 # Determine a reasonable location to place logs:
-: "${_LOG_DIR:="/var/log/${_TLA:-"rtd"}"}" ; mkdir -p "${_LOG_DIR}"
+: "${_LOG_DIR:="/var/log/${_tla:-"rtd"}"}" ; mkdir -p "${_LOG_DIR}"
 
 # Location of theme wallpapers
 _WALLPAPER_DIR="/opt/${_tla:-rtd}/themes/wallpaper"
@@ -112,14 +111,16 @@ theme::add_global ()
 	case "${1}" in
 		--bash | --font | --gtk | --icon | --kde )
 			pushd "${_my_scriptdir}/${1/--/}" || { write_error "${1/--/} not found where expected"; return 1; }
+			write_status "Entering ${_my_scriptdir}/${1/--/} directory"
 			local _tmp _archives
 			_tmp="$( mktemp -d )"
 			readarray -t _archives < <(find . -name '*.7z' -o -name '*.7z.001')
+			write_status "Found ${#_archives[@]} archives in ${1/--/} folder"
 
 			for arch in "${_archives[@]}"; do
 				# Extract only if it's a single .7z file or the first part of a multi-part archive
 				write_status "Processing package archive: $arch"
-				7z x "$arch" -aoa -o"${_tmp}"
+				7z x "$arch" -aoa -o"${_tmp}" || { write_error "An error occurred while trying to extract $arch"; return 1; }
 
 				# Remove leading './' if present due to `find` command usage
 				arch=${arch#./}
@@ -135,7 +136,7 @@ theme::add_global ()
 				fi
 
 				# Enter and run the included installer
-				pushd "${_tmp}/${dir_name}" || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; return 1; }
+				pushd "${_tmp}/${dir_name}" || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; }
 
 				if [[ -f ./run.sh ]]; then
 					write_status "Installing package contents: ${dir_name}"
@@ -257,32 +258,14 @@ theme::register_wallpapers_for_gnome ()
 
 
 
-set_colors ()
-{
-  	local ecode="\033["
-
-	yellow="${ecode}1;33m"
-	darkyellow="${ecode}0;33m"
-	red="${ecode}1;31m"
-	darkred="${ecode}0;31m"
-	endcolor="${ecode}0m"
-	green="${ecode}1;32m"
-	darkgreen="${ecode}1;32m"
-	blue="${ecode}1;34m"
-	darkblue="${ecode}0;34m"
-	cyan="${ecode}0;36"
-	darkcyan="${ecode}0;36"
-	gray="${ecode}0;37"
-	purple="${ecode}1;35"
-	darkpurple="${ecode}0;35"
-}
-
-
-
 
 
 write_host ()
 {
+	local _option
+	local _text
+	local color
+
 	_option=$1
 
 	case ${_option} in
@@ -300,9 +283,9 @@ write_host ()
 		--gray ) color="$(tput dim; tput setaf 7)" ;;
 		--purple ) color="$(tput bold; tput setaf 5)" ;;
 		--darkpurple ) color="$(tput dim; tput setaf 5)" ;;
-		*) local _text="$1" ;;
+		*) _text="$1" ;;
 	esac
-	[[ -z "${_text}" ]] && local _text="${color} 💻 $2 $(tput sgr0)"
+	[[ -z "${_text}" ]] && _text="${color} 💻 $2 $(tput sgr0)"
 	echo -e "${_text} "
 
 	# Tell the logging function to log the message requested...
@@ -310,9 +293,15 @@ write_host ()
 
 }
 
+set_colors() {
+  	local ecode="\033["
+	yellow="${ecode}1;33m"
+	endcolor="${ecode}0m"
+	green="${ecode}1;32m"
+	blue="${ecode}1;34m"
+}
 
-
-write_error ()
+write_error()
 {
 	local text=$1
 
@@ -332,8 +321,7 @@ write_error ()
 }
 
 
-write_warning ()
-{
+write_warning() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
@@ -348,8 +336,7 @@ write_warning ()
 }
 
 
-write_status ()
-{
+write_status() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
@@ -364,8 +351,7 @@ write_status ()
 }
 
 
-write_information ()
-{
+write_information() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
@@ -382,7 +368,7 @@ write_information ()
 
 
 
-theme::log_item () {
+theme::log_item() {
 	if [[ -z $_LOGFILE ]]; then
 		# If log file not set globally, set it to defaults for this function a.k.a. script name
 		local date
@@ -455,71 +441,76 @@ theme::log_item () {
 #::::::::::::::                                          ::::::::::::::::::::::
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
-set_colors
-[[ ! -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download |& tee "${_LOGFILE}"
 
 
-case $1 in
-	--gtk | --gnome )
-		theme::log_item "Foced install of GTK themes..."
-		theme::add_global --gtk
-	;;
-	--kde | --plasma )
-		theme::log_item "Foced install of KDE themes..."
-		theme::add_global --kde
-	;;
-	--all )
-		write_information "Foced install of ALL themes..."
-		theme::add_global --kde
-		theme::add_global --gtk
-		theme::add_global --icon
-		theme::add_global --font
-		theme::add_global --bash
-	;;
-	--icons | --icon)
-		theme::log_item "Installing icons only..."
-		theme::add_global --icon
-	;;
-	--fonts | --font )
-		theme::log_item "Installing fonts only"
-		theme::add_global --font
-	;;
-	--bash | --term | --terminal )
-		theme::log_item "Installing bash theme only"
-		theme::add_global --bash
-	;;
-	--wallpaper | --backgrounds | --images )
-		theme::log_item "Installing Wallpapers only"
-		theme::add_global --wallpaper
-	;;
-	--help )
-		theme::help
-	;;
-	* )
-		theme::log_item "No preference stated. Autodetecting themes for current environment..."
-		if  pgrep -f "plasmashell" ; then
-			theme::log_item "Found plasmashell; installing kde themes, icons, fonts, bash theme, and wallpapers..."
+
+main() {
+
+	[[ ! -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download |& tee "${_LOGFILE}"
+
+	case $1 in
+		--gtk | --gnome )
+			theme::log_item "Foced install of GTK themes..."
+			theme::add_global --gtk
+		;;
+		--kde | --plasma )
+			theme::log_item "Foced install of KDE themes..."
 			theme::add_global --kde
-			theme::add_global --icon
-			theme::add_global --font
-			theme::add_global --bash
-			theme::add_global --wallpaper
-		elif  pgrep -f "gnome-shell"; then
-			theme::log_item "Found gnome-shell; installing gnome themes, icons, fonts, bash theme, and wallpapers..."
+		;;
+		--all )
+			write_information "Foced install of ALL themes..."
+			theme::add_global --kde
 			theme::add_global --gtk
 			theme::add_global --icon
 			theme::add_global --font
 			theme::add_global --bash
-			theme::add_global --wallpaper
-		else
-			theme::log_item "Neither plasma or gnome was found! Only installing Icons, wallpapers and fonts."
+		;;
+		--icons | --icon)
+			theme::log_item "Installing icons only..."
 			theme::add_global --icon
+		;;
+		--fonts | --font )
+			theme::log_item "Installing fonts only"
 			theme::add_global --font
+		;;
+		--bash | --term | --terminal )
+			theme::log_item "Installing bash theme only"
+			theme::add_global --bash
+		;;
+		--wallpaper | --backgrounds | --images )
+			theme::log_item "Installing Wallpapers only"
 			theme::add_global --wallpaper
-		fi
-	;;
-esac
+		;;
+		--help )
+			theme::help
+		;;
+		* )
+			theme::log_item "No preference stated. Autodetecting themes for current environment..."
+			if  pgrep -f "plasmashell" ; then
+				theme::log_item "Found plasmashell; installing kde themes, icons, fonts, bash theme, and wallpapers..."
+				theme::add_global --kde
+				theme::add_global --icon
+				theme::add_global --font
+				theme::add_global --bash
+				theme::add_global --wallpaper
+			elif  pgrep -f "gnome-shell"; then
+				theme::log_item "Found gnome-shell; installing gnome themes, icons, fonts, bash theme, and wallpapers..."
+				theme::add_global --gtk
+				theme::add_global --icon
+				theme::add_global --font
+				theme::add_global --bash
+				theme::add_global --wallpaper
+			else
+				theme::log_item "Neither plasma or gnome was found! Only installing Icons, wallpapers and fonts."
+				theme::add_global --icon
+				theme::add_global --font
+				theme::add_global --wallpaper
+			fi
+		;;
+	esac
+}
 
+main "$*"
 
 #::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 #::::::::::::::                                          ::::::::::::::::::::::
