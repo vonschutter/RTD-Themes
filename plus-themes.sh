@@ -36,8 +36,15 @@ VERSION="1.00"
 : "${_my_scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"}"
 : "${_GIT_PROFILE:="vonschutter"}"
 : "${_scriptname="$( basename "${BASH_SOURCE[0]}" )"}"
+
+# Override _TLA and _tla (comment out the 2 lines below to auto assign _TLA and _tla from script name)
+_TLA=RTD
+_tla=rtd
+
+if [[ -z $_TLA ]] ; then 
 : "${_TLA:="$(basename "$0" .sh | cut -c 1-3 | tr '[:lower:]' '[:upper:]'); _TLA=${_TLA})"}"
 : "${_tla:="$(basename "$0" .sh | cut -c 1-3 | tr '[:upper:]' '[:lower:]')"}"
+fi
 
 # Determine a reasonable location to place logs:
 : "${_LOG_DIR:="/var/log/${_tla:-"rtd"}"}" ; mkdir -p "${_LOG_DIR}"
