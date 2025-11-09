@@ -51,6 +51,7 @@ fi
 
 # Location of theme wallpapers
 _WALLPAPER_DIR="/opt/${_tla:-rtd}/themes/wallpaper"
+: "${_XDG_WALLPAPER_DIR:="/usr/share/wallpapers"}"
 
 # Location of base administrative scripts and command-lets to get.
 export _git_src_url="https://github.com/${_GIT_PROFILE}/${_TLA^^}-Themes.git"
@@ -116,65 +117,74 @@ theme::run_command_in_gnome_user_session () {
 theme::add_global ()
 {
 	case "${1}" in
-		--bash | --font | --gtk | --icon | --kde )
-			pushd "${_my_scriptdir}/${1/--/}" || { write_error "${1/--/} not found where expected"; return 1; }
-			write_status "Entering ${_my_scriptdir}/${1/--/} directory"
-			local _tmp _archives
-			_tmp="$( mktemp -d )"
-			readarray -t _archives < <(find . -name '*.7z' -o -name '*.7z.001')
-			write_status "Found ${#_archives[@]} archives in ${1/--/} folder"
+			--bash | --font | --gtk | --icon | --kde )
+				local _tmp _archives dir_name
+				if ! (
+					cd "${_my_scriptdir}/${1/--/}" || { write_error "${1/--/} not found where expected"; exit 1; }
+					write_status "Entering ${_my_scriptdir}/${1/--/} directory"
 
-			for arch in "${_archives[@]}"; do
-				# Extract only if it's a single .7z file or the first part of a multi-part archive
-				write_status "Processing package archive: $arch"
-				7z x "$arch" -aoa -o"${_tmp}" || { write_error "An error occurred while trying to extract $arch"; return 1; }
+					if ! _tmp="$(mktemp -d)"; then
+						write_error "Unable to create temporary directory for ${1/--/} processing"
+						exit 1
+					fi
+					trap '[[ -d "$_tmp" ]] && rm -rf "$_tmp"' EXIT
 
-				# Remove leading './' if present due to `find` command usage
-				arch=${arch#./}
+					readarray -t _archives < <(find . -name '*.7z' -o -name '*.7z.001')
+					write_status "Found ${#_archives[@]} archives in ${1/--/} folder"
 
-				# set extracted folder name...
-				if [[ "$arch" =~ \.7z\.001$ ]]; then
-					dir_name="${arch%.7z.001}"
-				elif [[ "$arch" =~ \.7z$ ]]; then
-					dir_name="${arch%.7z}"
+					for arch in "${_archives[@]}"; do
+						# Extract only if it's a single .7z file or the first part of a multi-part archive
+						write_status "Processing package archive: $arch"
+						7z x "$arch" -aoa -o"${_tmp}" || { write_error "An error occurred while trying to extract $arch"; exit 1; }
+
+						# Remove leading './' if present due to `find` command usage
+						arch=${arch#./}
+
+						# set extracted folder name...
+						if [[ "$arch" =~ \.7z\.001$ ]]; then
+							dir_name="${arch%.7z.001}"
+						elif [[ "$arch" =~ \.7z$ ]]; then
+							dir_name="${arch%.7z}"
+						else
+							write_error "No matching extension for $arch"
+							continue
+						fi
+
+						# Enter and run the included installer
+						pushd "${_tmp}/${dir_name}" >/dev/null || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; exit 1; }
+
+						if [[ -f ./run.sh ]]; then
+							write_status "Installing package contents: ${dir_name}"
+							bash ./run.sh || { write_error "An error occurred while trying to run the run.sh"; popd >/dev/null; exit 1; }
+						elif [[ -f ./install.sh ]]; then
+							write_status "Installing package contents: ${dir_name}"
+							bash ./install.sh || { write_error "An error occurred while trying to run the install.sh"; popd >/dev/null; exit 1; }
+						fi
+
+						popd >/dev/null || { write_error "Failure to pop from directory ${dir_name}"; exit 1; }
+					done
+				); then
+					return 1
+				fi
+			;;
+			--wallpaper )
+				local _wall_dir="${_my_scriptdir}/${1/--/}"
+				chmod 555 -R "${_wall_dir}"
+				if  pgrep -f "gnome-shell" &>/dev/null ; then
+					theme::log_item "Registering GNOME wallpapers in: ${_WALLPAPER_DIR}"
+					theme::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
+					write_status "Setting Wallpaper: file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
+					theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
+					theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri-dark file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
+				elif  pgrep -f "plasmashell" &>/dev/null ; then
+					theme::log_item "Registering Plasma wallpapers in: ${_XDG_WALLPAPER_DIR}/"
+					theme::register_wallpapers_for_plasma "${_wall_dir}" "${_XDG_WALLPAPER_DIR}" || return 1
 				else
-					write_error "No matching extension for $arch"
-					continue
+					theme::log_item "Unknown DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
+					theme::register_wallpapers_for_plasma "${_wall_dir}" "${_XDG_WALLPAPER_DIR}" || return 1
+					theme::register_wallpapers_for_plasma "${_wall_dir}" "/usr/share/backgrounds" || return 1
 				fi
-
-				# Enter and run the included installer
-				pushd "${_tmp}/${dir_name}" || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; }
-
-				if [[ -f ./run.sh ]]; then
-					write_status "Installing package contents: ${dir_name}"
-					bash ./run.sh || { write_error "An error occurred while trying to run the run.sh"; return 1; }
-				elif [[ -f ./install.sh ]]; then
-					write_status "Installing package contents: ${dir_name}"
-					bash ./install.sh || { write_error "An error occurred while trying to run the install.sh"; return 1; }
-				fi
-
-				popd || { write_error "Failure to pop from directory ${dir_name}"; return 1; }
-			done
-
-			popd || { write_error "Failure to pop from directory ${1/--/}"; return 1; }
-		;;
-		--wallpaper )
-			chmod 555 -R "${_my_scriptdir}/${1/--/}"
-			if  pgrep -f "gnome-shell" &>/dev/null ; then
-				theme::log_item "Registering wallpapers in: ${_WALLPAPER_DIR} "
-				theme::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
-				write_status "Setting Wallpaper: file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
-				theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
-				theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri-dark file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
-			elif  pgrep -f "plasmashell" &>/dev/null ; then
-				theme::log_item "Registering wallpapers in: ${_XDG_WALLPAPER_DIR}/"
-				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
-			else
-				theme::log_item "NOT Sure what DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
-				ln -fs "${_my_scriptdir}/${1/--/}"/* "${_XDG_WALLPAPER_DIR}"/ || return 1
-				ln -fs "${_my_scriptdir}/${1/--/}"/* /usr/share/backgrounds/ || return 1
-			fi
-		;;
+			;;
 		* )
 			write_warning "Neither GTK or KDE themes were requested"
 		;;
@@ -219,28 +229,46 @@ dependency::theme_payload ()
 
 theme::register_wallpapers_for_gnome ()
 {
-	# Validate the input directory
-	local _wallpaper_dir="${1}"
+	local _wallpaper_dir="$1"
 	if [[ ! -d "$_wallpaper_dir" ]]; then
-		write_error "Error: Directory '$_wallpaper_dir' does not exist."
+		write_error "Directory '$_wallpaper_dir' does not exist."
 		return 1
 	fi
 
 	local xml_file="oem-backgrounds.xml"
 	local dest_dir="/usr/share/gnome-background-properties"
 	local dest_file="${dest_dir}/${xml_file}"
+	local tmp_xml tmp_new dest_existed=0
 
-	# Start with the XML header
-	cat > "$xml_file" <<-EOF
+	if ! tmp_xml="$(mktemp)"; then
+		write_error "Unable to allocate temporary file for wallpaper registration."
+		return 1
+	fi
+	tmp_new="${tmp_xml}.new"
+	local cleanup_cmd="rm -f \"$tmp_xml\" \"$tmp_new\""
+
+	if [[ -f "$dest_file" ]]; then
+		dest_existed=1
+		cp "$dest_file" "$tmp_xml" || { write_error "Failed to copy existing wallpaper registry."; eval "$cleanup_cmd"; return 1; }
+	else
+		cat > "$tmp_xml" <<-EOF
 	<?xml version="1.0" encoding="UTF-8"?>
 	<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
 	<wallpapers>
+	</wallpapers>
 	EOF
+	fi
 
-	# Safely iterate over .jpg and .png files
+	local -a entries_to_add=()
+	local added=0 skipped=0
 	shopt -s nullglob
 	for i in "$_wallpaper_dir"/*.jpg "$_wallpaper_dir"/*.png; do
-		cat >> "$xml_file" <<-EOF
+		[[ -f "$i" ]] || continue
+		if grep -Fq "<filename>$i</filename>" "$tmp_xml"; then
+			((skipped++))
+			continue
+		fi
+		read -r -d '' entry <<-EOF || true
 	<wallpaper>
 	    <name>$(basename "$i")</name>
 	    <filename>$i</filename>
@@ -250,17 +278,61 @@ theme::register_wallpapers_for_gnome ()
 	    <shade_type>solid</shade_type>
 	</wallpaper>
 	EOF
+		entries_to_add+=("$entry")
+		((added++))
 	done
 	shopt -u nullglob
 
-	# Finish with the XML footer
-	echo "</wallpapers>" >> "$xml_file"
+	if (( added > 0 )); then
+		local add_block
+		add_block=$(printf "%s\n" "${entries_to_add[@]}")
+		awk -v block="$add_block" '
+			BEGIN { inserted=0 }
+			/<\/wallpapers>/ && !inserted { print block; inserted=1 }
+			{ print }
+		' "$tmp_xml" > "$tmp_new" || { write_error "Failed to update wallpaper registry."; eval "$cleanup_cmd"; return 1; }
+		mv "$tmp_new" "$tmp_xml"
+		mkdir -p "$dest_dir"
+		install -m 644 "$tmp_xml" "$dest_file" || { write_error "Unable to install updated wallpaper registry."; eval "$cleanup_cmd"; return 1; }
+		write_status "Registered ${added} new GNOME wallpapers (${skipped} already present)."
+	elif (( ! dest_existed )); then
+		write_warning "No wallpapers found to register for GNOME."
+	else
+		write_status "No new GNOME wallpapers needed (${skipped} already present)."
+	fi
+	eval "$cleanup_cmd"
+	return 0
+}
 
-	# Ensure the destination directory exists
-	mkdir -p "$dest_dir"
-	mv "$xml_file" "$dest_file"
+theme::register_wallpapers_for_plasma () {
+	local source_dir="$1"
+	local target_dir="${2:-${_XDG_WALLPAPER_DIR:-/usr/share/wallpapers}}"
 
-	echo "Wallpapers registered successfully at $dest_file"
+	if [[ ! -d "$source_dir" ]]; then
+		write_error "Directory '$source_dir' does not exist."
+		return 1
+	fi
+
+	mkdir -p "$target_dir"
+
+	local added=0 skipped=0
+	shopt -s nullglob
+	for img in "$source_dir"/*.jpg "$source_dir"/*.png; do
+		[[ -e "$img" ]] || continue
+		local dest_path="${target_dir}/$(basename "$img")"
+		if [[ -e "$dest_path" || -L "$dest_path" ]]; then
+			if cmp -s "$img" "$dest_path" 2>/dev/null; then
+				((skipped++))
+				continue
+			fi
+		fi
+		ln -sf "$img" "$dest_path"
+		((added++))
+	done
+	shopt -u nullglob
+
+	write_status "Linked ${added} wallpapers into ${target_dir} for Plasma (${skipped} already present)."
+	return 0
 }
 
 
@@ -527,5 +599,3 @@ main "$*"
 unset _my_scriptdir
 unset _potential_dependencies
 unset _tmp
-
-
