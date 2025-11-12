@@ -171,16 +171,16 @@ theme::add_global ()
 				local _wall_dir="${_my_scriptdir}/${1/--/}"
 				chmod 555 -R "${_wall_dir}"
 				if  pgrep -f "gnome-shell" &>/dev/null ; then
-					theme::log_item "Registering GNOME wallpapers in: ${_WALLPAPER_DIR}"
+					system::log_item "Registering GNOME wallpapers in: ${_WALLPAPER_DIR}"
 					theme::register_wallpapers_for_gnome "${_WALLPAPER_DIR}" || return 1
 					write_status "Setting Wallpaper: file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
 					theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
 					theme::run_command_in_gnome_user_session "gsettings set org.gnome.desktop.background picture-uri-dark file://${_WALLPAPER_DIR}/RTD_Wallpapers_HQ_Public_Domain_024.jpg"
 				elif  pgrep -f "plasmashell" &>/dev/null ; then
-					theme::log_item "Registering Plasma wallpapers in: ${_XDG_WALLPAPER_DIR}/"
+					system::log_item "Registering Plasma wallpapers in: ${_XDG_WALLPAPER_DIR}/"
 					theme::register_wallpapers_for_plasma "${_wall_dir}" "${_XDG_WALLPAPER_DIR}" || return 1
 				else
-					theme::log_item "Unknown DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
+					system::log_item "Unknown DE, registering wallpapers in: ${_XDG_WALLPAPER_DIR}/ and /usr/share/backgrounds/"
 					theme::register_wallpapers_for_plasma "${_wall_dir}" "${_XDG_WALLPAPER_DIR}" || return 1
 					theme::register_wallpapers_for_plasma "${_wall_dir}" "/usr/share/backgrounds" || return 1
 				fi
@@ -198,16 +198,16 @@ dependency::theme_payload ()
 
 	--download | --desktop )
 		if echo "$OSTYPE" |grep "linux" ; then
-			theme::log_item "Linux OS Found: Attempting to get themes for Linux..."
+			system::log_item "Linux OS Found: Attempting to get themes for Linux..."
 			if ! hash git &>> "${_LOGFILE}" ; then
-				theme::log_item "git was not found, attempting to install it..."
+				system::log_item "git was not found, attempting to install it..."
 				for i in apt yum dnf zypper ; do $i -y install git ; done
 			fi
 			
 			if git clone --depth=1 "${_git_src_url}" /opt/"${_TLA,,}/themes" ; then
 				echo "Themes successfully retrieved..."
 			else
-				theme::log_item "Failed to retrieve instructions correctly! "
+				system::log_item "Failed to retrieve instructions correctly! "
 				return 1
 			fi
 		elif [[ "$OSTYPE" == "darwin"* ]]; then
@@ -368,11 +368,11 @@ write_host ()
 	echo -e "${_text} "
 
 	# Tell the logging function to log the message requested...
-	theme::log_item "🧩 💻 ${FUNCNAME[1]}: ${_text}"
+	system::log_item "🧩 💻 ${FUNCNAME[1]}: ${_text}"
 
 }
 
-set_colors() {
+theme::term::set_colors() {
   	local ecode="\033["
 	yellow="${ecode}1;33m"
 	endcolor="${ecode}0m"
@@ -380,7 +380,7 @@ set_colors() {
 	blue="${ecode}1;34m"
 }
 
-write_error()
+theme::write_error()
 {
 	local text=$1
 
@@ -395,12 +395,12 @@ write_error()
 	fi
 
 	# Tell the logging function to log the message requested...
-	[ -n "${text}" ] && theme::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && system::log_item "🧩 💥 ${FUNCNAME[1]}: ${text}"
 
 }
 
 
-write_warning() {
+theme::write_warning() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
@@ -410,12 +410,12 @@ write_warning() {
 	fi
 
 	# Tell the logging function to log the message requested...
-	[ -n "${text}" ] && theme::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && system::log_item "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
 	
 }
 
 
-write_status() {
+theme::write_status() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
@@ -425,12 +425,12 @@ write_status() {
 	fi
 
 	# Tell the logging function to log the message requested...
-	[ -n "${text}" ] && theme::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
+	[ -n "${text}" ] && system::log_item "🧩 ✓ ${FUNCNAME[1]}: ${text}"
 	
 }
 
 
-write_information() {
+theme::write_information() {
 	local text=$1
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
@@ -440,14 +440,14 @@ write_information() {
 	fi
 
 	# Tell the logging function to log the message requested...
-	theme::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
+	system::log_item "🧩 🛈 ${FUNCNAME[1]}: ${text}"
 	
 }
 
 
 
 
-theme::log_item() {
+theme::system::log_item() {
 	if [[ -z $_LOGFILE ]]; then
 		# If log file not set globally, set it to defaults for this function a.k.a. script name
 		local date
@@ -511,6 +511,37 @@ theme::log_item() {
 	echo "${log_prefix} ${log_type} : ${log_message}" >> "$logfile"
 }
 
+theme::alias_missing_core_functions() {
+	# Alias theme functions to core functions if core functions are missing.
+	# Use core functions when they exist to behave consistently if sourced.
+	#
+	local theme_func core_func
+	local -a theme_functions=(
+		"theme::write_error"
+		"theme::write_warning"
+		"theme::write_status"
+		"theme::write_information"
+		"theme::system::log_item"
+		"theme::term::set_colors"
+	)
+
+	for theme_func in "${theme_functions[@]}"; do
+		core_func="${theme_func#theme::}"
+
+		# Skip when a core implementation already exists.
+		if declare -F "$core_func" >/dev/null 2>&1; then
+			continue
+		fi
+
+		# Alias the theme helper so generic calls resolve here.
+		if declare -F "$theme_func" >/dev/null 2>&1 && ! alias "$core_func" >/dev/null 2>&1; then
+			alias "${core_func}=${theme_func}"
+		fi
+	done
+}
+
+
+
 
 
 
@@ -525,15 +556,17 @@ theme::log_item() {
 
 main() {
 
+	theme::alias_missing_core_functions
+
 	[[ ! -d "/opt/${_TLA}/themes"  ]] || dependency::theme_payload --download |& tee "${_LOGFILE}"
 
 	case $1 in
 		--gtk | --gnome )
-			theme::log_item "Foced install of GTK themes..."
+			system::log_item "Foced install of GTK themes..."
 			theme::add_global --gtk
 		;;
 		--kde | --plasma )
-			theme::log_item "Foced install of KDE themes..."
+			system::log_item "Foced install of KDE themes..."
 			theme::add_global --kde
 		;;
 		--all )
@@ -545,42 +578,42 @@ main() {
 			theme::add_global --bash
 		;;
 		--icons | --icon)
-			theme::log_item "Installing icons only..."
+			system::log_item "Installing icons only..."
 			theme::add_global --icon
 		;;
 		--fonts | --font )
-			theme::log_item "Installing fonts only"
+			system::log_item "Installing fonts only"
 			theme::add_global --font
 		;;
 		--bash | --term | --terminal )
-			theme::log_item "Installing bash theme only"
+			system::log_item "Installing bash theme only"
 			theme::add_global --bash
 		;;
 		--wallpaper | --backgrounds | --images )
-			theme::log_item "Installing Wallpapers only"
+			system::log_item "Installing Wallpapers only"
 			theme::add_global --wallpaper
 		;;
 		--help )
 			theme::help
 		;;
 		* )
-			theme::log_item "No preference stated. Autodetecting themes for current environment..."
+			system::log_item "No preference stated. Autodetecting themes for current environment..."
 			if  pgrep -f "plasmashell" ; then
-				theme::log_item "Found plasmashell; installing kde themes, icons, fonts, bash theme, and wallpapers..."
+				system::log_item "Found plasmashell; installing kde themes, icons, fonts, bash theme, and wallpapers..."
 				theme::add_global --kde
 				theme::add_global --icon
 				theme::add_global --font
 				theme::add_global --bash
 				theme::add_global --wallpaper
 			elif  pgrep -f "gnome-shell"; then
-				theme::log_item "Found gnome-shell; installing gnome themes, icons, fonts, bash theme, and wallpapers..."
+				system::log_item "Found gnome-shell; installing gnome themes, icons, fonts, bash theme, and wallpapers..."
 				theme::add_global --gtk
 				theme::add_global --icon
 				theme::add_global --font
 				theme::add_global --bash
 				theme::add_global --wallpaper
 			else
-				theme::log_item "Neither plasma or gnome was found! Only installing Icons, wallpapers and fonts."
+				system::log_item "Neither plasma or gnome was found! Only installing Icons, wallpapers and fonts."
 				theme::add_global --icon
 				theme::add_global --font
 				theme::add_global --wallpaper
