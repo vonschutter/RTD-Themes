@@ -512,8 +512,9 @@ theme::system::log_item() {
 }
 
 theme::alias_missing_core_functions() {
-	# Alias theme functions to core functions if core functions are missing.
-	# Use core functions when they exist to behave consistently if sourced.
+	# Provide fallbacks for core logging helpers when the RTD library is not sourced.
+	# Prefer existing core implementations; otherwise, define light wrappers that
+	# delegate to the theme helpers so non-interactive shells still resolve them.
 	#
 	local theme_func core_func
 	local -a theme_functions=(
@@ -533,9 +534,9 @@ theme::alias_missing_core_functions() {
 			continue
 		fi
 
-		# Alias the theme helper so generic calls resolve here.
-		if declare -F "$theme_func" >/dev/null 2>&1 && ! alias "$core_func" >/dev/null 2>&1; then
-			alias "${core_func}=${theme_func}"
+		# Define a thin wrapper so generic calls resolve even without expand_aliases.
+		if declare -F "$theme_func" >/dev/null 2>&1; then
+			eval "${core_func}(){ ${theme_func} \"\$@\"; }"
 		fi
 	done
 }
