@@ -159,6 +159,12 @@ theme::add_global ()
 						elif [[ -f ./install.sh ]]; then
 							write_status "Installing package contents: ${dir_name}"
 							bash ./install.sh || { write_error "An error occurred while trying to run the install.sh"; popd >/dev/null; exit 1; }
+						elif [[ -f ./install ]]; then
+							write_status "Installing package contents: ${dir_name}"
+							bash ./install || { write_error "An error occurred while trying to run the install"; popd >/dev/null; exit 1; }
+						else
+							write_warning "No install.sh or run.sh found in ${dir_name}, skipping..."
+							return 1
 						fi
 
 						popd >/dev/null || { write_error "Failure to pop from directory ${dir_name}"; exit 1; }
