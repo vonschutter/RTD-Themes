@@ -385,27 +385,29 @@ write_host ()
 	local _option
 	local _text
 	local color
+	local reset
 
 	_option=$1
+	reset="$(tput sgr0 2>/dev/null || printf '\033[0m')"
 
 	case ${_option} in
-		--yellow ) color="$(tput bold; tput setaf 3)" ;;
-		--darkyellow ) color="$(tput dim; tput setaf 3)" ;;
-		--red ) color="$(tput bold; tput setaf 1)" ;;
-		--darkred ) color="$(tput setaf 3)" ;;
-		--endcolor ) color="$(tput sgr0)" ;;
-		--green ) color="$(tput bold; tput setaf 2)" ;;
-		--darkgreen ) color="$(tput dim; tput setaf 2)" ;;
-		--blue ) color="$(tput bold; tput setaf 4)" ;;
-		--darkblue ) color="$(tput dim; tput setaf 4)" ;;
-		--cyan ) color="$(tput bold; tput setaf 6)" ;;
-		--darkcyan ) color="$(tput dim; tput setaf 6)" ;;
-		--gray ) color="$(tput dim; tput setaf 7)" ;;
-		--purple ) color="$(tput bold; tput setaf 5)" ;;
-		--darkpurple ) color="$(tput dim; tput setaf 5)" ;;
+		--yellow ) color="$(tput bold 2>/dev/null; tput setaf 3 2>/dev/null)" ;;
+		--darkyellow ) color="$(tput dim 2>/dev/null; tput setaf 3 2>/dev/null)" ;;
+		--red ) color="$(tput bold 2>/dev/null; tput setaf 1 2>/dev/null)" ;;
+		--darkred ) color="$(tput setaf 3 2>/dev/null)" ;;
+		--endcolor ) color="$reset" ;;
+		--green ) color="$(tput bold 2>/dev/null; tput setaf 2 2>/dev/null)" ;;
+		--darkgreen ) color="$(tput dim 2>/dev/null; tput setaf 2 2>/dev/null)" ;;
+		--blue ) color="$(tput bold 2>/dev/null; tput setaf 4 2>/dev/null)" ;;
+		--darkblue ) color="$(tput dim 2>/dev/null; tput setaf 4 2>/dev/null)" ;;
+		--cyan ) color="$(tput bold 2>/dev/null; tput setaf 6 2>/dev/null)" ;;
+		--darkcyan ) color="$(tput dim 2>/dev/null; tput setaf 6 2>/dev/null)" ;;
+		--gray ) color="$(tput dim 2>/dev/null; tput setaf 7 2>/dev/null)" ;;
+		--purple ) color="$(tput bold 2>/dev/null; tput setaf 5 2>/dev/null)" ;;
+		--darkpurple ) color="$(tput dim 2>/dev/null; tput setaf 5 2>/dev/null)" ;;
 		*) _text="$1" ;;
 	esac
-	[[ -z "${_text}" ]] && _text="${color} 💻 $2 $(tput sgr0)"
+	[[ -z "${_text}" ]] && _text="${color} 💻 $2 ${reset}"
 	echo -e "${_text} "
 
 	# Tell the logging function to log the message requested...
@@ -424,14 +426,16 @@ theme::term::set_colors() {
 theme::write_error()
 {
 	local text=$1
+	local reset
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		if [[ -n "${text}" ]]; then
 			echo "🧩 💥 ${FUNCNAME[1]}: ${text}"
 		fi
 	else
+		reset="$(tput sgr0 2>/dev/null || printf '\033[0m')"
 		if [[ -n "${text}" ]]; then
-			echo -e "$(tput bold; tput setaf 1)🧩 💥 ${FUNCNAME[1]}: ${text}${endcolor}"
+			echo -e "$(tput bold 2>/dev/null; tput setaf 1 2>/dev/null)🧩 💥 ${FUNCNAME[1]}: ${text}${reset}"
 		fi
 	fi
 
@@ -443,11 +447,14 @@ theme::write_error()
 
 theme::write_warning() {
 	local text=$1
+	local color reset
 
 	if [[ "${TERMUITXT}" == "nocolor" ]]; then
 		[ -n "${text}" ] && echo "🧩 ⚠ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${yellow}🧩 ⚠ ${FUNCNAME[1]}: ${text}${endcolor}"
+		color="$(tput bold 2>/dev/null; tput setaf 3 2>/dev/null)"
+		reset="$(tput sgr0 2>/dev/null || printf '\033[0m')"
+		[ -n "${text}" ] && echo -e "${color}🧩 ⚠ ${FUNCNAME[1]}: ${text}${reset}"
 	fi
 
 	# Tell the logging function to log the message requested...
@@ -458,11 +465,14 @@ theme::write_warning() {
 
 theme::write_status() {
 	local text=$1
+	local color reset
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
 		[ -n "${text}" ] && echo "🧩 ✓ ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${green}🧩 ✓ ${FUNCNAME[1]}: ${text}${endcolor}"
+		color="$(tput bold 2>/dev/null; tput setaf 2 2>/dev/null)"
+		reset="$(tput sgr0 2>/dev/null || printf '\033[0m')"
+		[ -n "${text}" ] && echo -e "${color}🧩 ✓ ${FUNCNAME[1]}: ${text}${reset}"
 	fi
 
 	# Tell the logging function to log the message requested...
@@ -473,11 +483,14 @@ theme::write_status() {
 
 theme::write_information() {
 	local text=$1
+	local color reset
 
 	if [[ "${TERMUITXT}" == "nocolor" ]] ; then
 		[ -n "${text}" ] && echo -e "🧩 🛈 ${FUNCNAME[1]}: ${text}"
 	else
-		[ -n "${text}" ] && echo -e "${blue}🧩 🛈 ${FUNCNAME[1]}: ${text}${endcolor}"
+		color="$(tput bold 2>/dev/null; tput setaf 4 2>/dev/null)"
+		reset="$(tput sgr0 2>/dev/null || printf '\033[0m')"
+		[ -n "${text}" ] && echo -e "${color}🧩 🛈 ${FUNCNAME[1]}: ${text}${reset}"
 	fi
 
 	# Tell the logging function to log the message requested...
