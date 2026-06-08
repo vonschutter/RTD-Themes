@@ -48,6 +48,7 @@ fi
 
 # Determine a reasonable location to place logs:
 : "${_LOG_DIR:="/var/log/${_tla:-"rtd"}"}" ; mkdir -p "${_LOG_DIR}"
+: "${_CACHE_DIR:="/opt/${_tla:-rtd}/cache"}"
 
 # Location of theme wallpapers
 _WALLPAPER_DIR="/opt/${_tla:-rtd}/themes/wallpaper"
@@ -114,28 +115,54 @@ theme::run_command_in_gnome_user_session () {
 }
 
 
+theme::tmp_base ()
+{
+	local tmp_base="${RTD_THEME_TMPDIR:-${_CACHE_DIR}/theme-install-tmp}"
+
+	if ! mkdir -p "$tmp_base"; then
+		write_error "Unable to create theme temporary base: ${tmp_base}"
+		return 1
+	fi
+
+	chmod 700 "$tmp_base" 2>/dev/null || true
+	printf '%s\n' "$tmp_base"
+}
+
+
 theme::add_global ()
 {
 	case "${1}" in
 			--bash | --font | --gtk | --icon | --kde )
-				local _tmp _archives dir_name
+				local _tmp_base _tmp _archives dir_name
 				if ! (
 					cd "${_my_scriptdir}/${1/--/}" || { write_error "${1/--/} not found where expected"; exit 1; }
 					write_status "Entering ${_my_scriptdir}/${1/--/} directory"
 
-					if ! _tmp="$(mktemp -d)"; then
+					if ! _tmp_base="$(theme::tmp_base)"; then
+						exit 1
+					fi
+
+					if ! _tmp="$(mktemp -d "${_tmp_base}/${1/--/}.XXXXXX")"; then
 						write_error "Unable to create temporary directory for ${1/--/} processing"
 						exit 1
 					fi
 					trap '[[ -d "$_tmp" ]] && rm -rf "$_tmp"' EXIT
+					export TMPDIR="${_tmp}"
 
 					readarray -t _archives < <(find . -name '*.7z' -o -name '*.7z.001')
 					write_status "Found ${#_archives[@]} archives in ${1/--/} folder"
 
 					for arch in "${_archives[@]}"; do
+						local _archive_tmp
+
 						# Extract only if it's a single .7z file or the first part of a multi-part archive
 						write_status "Processing package archive: $arch"
-						7z x "$arch" -aoa -o"${_tmp}" || { write_error "An error occurred while trying to extract $arch"; exit 1; }
+						if ! _archive_tmp="$(mktemp -d "${_tmp}/archive.XXXXXX")"; then
+							write_error "Unable to create temporary extraction directory for $arch"
+							exit 1
+						fi
+
+						7z x "$arch" -aoa -o"${_archive_tmp}" || { write_error "An error occurred while trying to extract $arch"; rm -rf "$_archive_tmp"; exit 1; }
 
 						# Remove leading './' if present due to `find` command usage
 						arch=${arch#./}
@@ -147,27 +174,31 @@ theme::add_global ()
 							dir_name="${arch%.7z}"
 						else
 							write_error "No matching extension for $arch"
+							rm -rf "$_archive_tmp"
 							continue
 						fi
 
 						# Enter and run the included installer
-						pushd "${_tmp}/${dir_name}" >/dev/null || { write_error "A problem was encountered when attempting to access the directory ${_tmp}/${dir_name}"; exit 1; }
+						pushd "${_archive_tmp}/${dir_name}" >/dev/null || { write_error "A problem was encountered when attempting to access the directory ${_archive_tmp}/${dir_name}"; rm -rf "$_archive_tmp"; exit 1; }
 
 						if [[ -f ./run.sh ]]; then
 							write_status "Installing package contents: ${dir_name}"
-							bash ./run.sh || { write_error "An error occurred while trying to run the run.sh"; popd >/dev/null; exit 1; }
+							bash ./run.sh || { write_error "An error occurred while trying to run the run.sh"; popd >/dev/null; rm -rf "$_archive_tmp"; exit 1; }
 						elif [[ -f ./install.sh ]]; then
 							write_status "Installing package contents: ${dir_name}"
-							bash ./install.sh || { write_error "An error occurred while trying to run the install.sh"; popd >/dev/null; exit 1; }
+							bash ./install.sh || { write_error "An error occurred while trying to run the install.sh"; popd >/dev/null; rm -rf "$_archive_tmp"; exit 1; }
 						elif [[ -f ./install ]]; then
 							write_status "Installing package contents: ${dir_name}"
-							bash ./install || { write_error "An error occurred while trying to run the install"; popd >/dev/null; exit 1; }
+							bash ./install || { write_error "An error occurred while trying to run the install"; popd >/dev/null; rm -rf "$_archive_tmp"; exit 1; }
 						else
 							write_warning "No install.sh or run.sh found in ${dir_name}, skipping..."
+							popd >/dev/null || true
+							rm -rf "$_archive_tmp"
 							return 1
 						fi
 
-						popd >/dev/null || { write_error "Failure to pop from directory ${dir_name}"; exit 1; }
+						popd >/dev/null || { write_error "Failure to pop from directory ${dir_name}"; rm -rf "$_archive_tmp"; exit 1; }
+						rm -rf "$_archive_tmp"
 					done
 				); then
 					return 1
@@ -244,9 +275,13 @@ theme::register_wallpapers_for_gnome ()
 	local xml_file="oem-backgrounds.xml"
 	local dest_dir="/usr/share/gnome-background-properties"
 	local dest_file="${dest_dir}/${xml_file}"
-	local tmp_xml tmp_new dest_existed=0
+	local tmp_base tmp_xml tmp_new dest_existed=0
 
-	if ! tmp_xml="$(mktemp)"; then
+	if ! tmp_base="$(theme::tmp_base)"; then
+		return 1
+	fi
+
+	if ! tmp_xml="$(TMPDIR="$tmp_base" mktemp)"; then
 		write_error "Unable to allocate temporary file for wallpaper registration."
 		return 1
 	fi
